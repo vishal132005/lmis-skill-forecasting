@@ -1,0 +1,13 @@
+{
+  "name": "lmis",
+  "version": "1.0.0",
+  "description": "Labour Market Intelligence System (LMIS)",
+  "private": true,
+  "scripts": {
+    "dev:api": "npm run dev --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web",
+    "dev": "npm run dev:api & npm run dev:web",
+    "seed": "npm run seed --prefix apps/api",
+    "install:all": "npm install && npm install --prefix apps/api && npm install --prefix apps/web"
+  }
+}
