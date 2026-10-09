@@ -1,7 +1,9 @@
 # Replacing AI Model Stubs with Real Models
 
-This directory contains **placeholder AI/ML modules** for the LMIS system.
-Each module returns deterministic mock data so the full system runs end-to-end.
+This directory contains placeholder AI/ML modules for the LMIS system. The
+forecaster is an exception: it runs deterministic statistical baselines over
+the supplied source history. It is not a trained ML model. Other model modules
+remain placeholders.
 
 ## Architecture
 
@@ -80,9 +82,14 @@ transformers==4.35.0
 
 ### 3. Forecaster (`forecaster.py`)
 - **Endpoint**: `POST /ai/forecast`
-- **Input**: `{district_id, trade_id, horizon_months, history?: [{month, demand, supply}]}`
-- **Output**: `{forecasts: [{month, demand_forecast, supply_forecast, gap, lower_ci, upper_ci}]}`
-- **Suggested approach**: Prophet, ARIMA, or Temporal Fusion Transformer
+- **Input**: `{district_id, trade_id, horizon_months, sources: {job_postings: [{period, value}], industry_hiring: [{period, value}]}}`
+- **Output**: source-specific chronological history and forecasts, selected method, rolling-origin MAE/RMSE, evaluation windows, and explicit availability/insufficient-history status.
+- **Methods**: last observation, seasonal naive (requires 24 months), and damped linear trend. Candidate selection uses MAE over common rolling-origin windows; the supported horizon is 1–12 months.
+- **Missing months**: never filled with zero; a series with gaps is not forecast.
+- **Uncertainty**: prediction intervals are unavailable; no confidence interval is returned.
+- Job postings are summed across the available `source` labels. The current schema has no posting identity for deduplication across portals.
+- **Provenance**: the current Express API labels outputs from the seeded SQLite histories as synthetic demonstration data.
+- **Contract note**: the earlier mock `{history: [{month, demand, supply}]}` contract had no Express or frontend caller in the repository and forecast table records are not used as history. It has been replaced with independent source histories to avoid combining unlike signals or forecasting the legacy mock supply series.
 
 ### 4. Gap Scorer (`gap_scorer.py`)
 - **Endpoint**: `POST /ai/gap-score`
@@ -110,19 +117,23 @@ cd apps/ai-service
 pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --port 8000
 
+# Run the forecasting baseline tests
+python -m unittest discover -s tests
+
 # Check model status
 curl http://localhost:8000/ai/model-status
 
 # Test your endpoint
+# This one-month example demonstrates the request shape and returns
+# `insufficient_history`; forecasts require enough consecutive observations.
 curl -X POST http://localhost:8000/ai/forecast \
   -H "Content-Type: application/json" \
-  -d '{"district_id": "MH-MUM", "trade_id": "HC-GDA", "horizon_months": 6}'
+  -d '{"district_id": "MH-MUM", "trade_id": "HC-GDA", "horizon_months": 6, "sources": {"job_postings": [{"period": "2024-01", "value": 80}], "industry_hiring": []}}'
 ```
 
 ## Important Notes
 
-- **Response schema must be preserved**: Your model's output must match the Pydantic response schemas
-- **Set `is_mock: false`** in responses when using real models
-- **Set `_is_mock = False`** on the model class to report correctly in `/ai/model-status`
-- **Graceful fallback**: The Node API will fall back to rule-based logic if the AI service is down
+- The forecaster reports `is_mock: false` in model status because its results are calculated from supplied histories; this does not mean it is a trained ML model or that the synthetic data is real.
+- Forecast requests through the Express API return a classified service error when the Python service is unavailable. They do not return fallback or fabricated predictions.
+- The existing `GET /api/v1/forecasts` endpoint remains the compatibility route for previously stored demonstration forecasts; it is not used as forecast history.
 - **All models are singletons**: Loaded once at startup via `_model = YourModel(); _model.load()`

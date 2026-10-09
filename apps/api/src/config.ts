@@ -3,6 +3,8 @@ import path from 'path';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
+const apiDirectory = path.resolve(__dirname, '..');
+
 export const config = {
   port: parseInt(process.env.API_PORT || '4000', 10),
   host: process.env.API_HOST || '0.0.0.0',
@@ -21,6 +23,6 @@ export const config = {
   },
   db: {
     type: process.env.DB_TYPE || 'sqlite',
-    sqlitePath: process.env.SQLITE_PATH || path.resolve(__dirname, '../data/lmis.db'),
+    sqlitePath: path.resolve(apiDirectory, process.env.SQLITE_PATH || 'data/lmis.db'),
   },
 };

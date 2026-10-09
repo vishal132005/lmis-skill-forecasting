@@ -1,9 +1,9 @@
 """
 LMIS AI Service – FastAPI application.
 
-Provides ML/AI endpoints for the Labour Market Intelligence System.
-All models are stubs returning mock data by default (USE_MOCK_MODELS=true).
-See app/models/README.md for how to replace stubs with real models.
+Provides AI endpoints and statistical forecasting for the Labour Market
+Intelligence System. The forecaster uses statistical baselines; other model
+modules remain stubs and may return mock data. See app/models/README.md.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,9 +28,9 @@ from .models.explainer import _model as explainer_model
 app = FastAPI(
     title="LMIS AI Service",
     description=(
-        "Machine Learning and AI endpoints for the Labour Market Intelligence System (LMIS). "
-        "Provides taxonomy mapping, demand indexing, forecasting, gap scoring, anomaly detection, "
-        "and explainability. All endpoints return mock data by default."
+        "AI and statistical endpoints for the Labour Market Intelligence System (LMIS). "
+        "The forecaster provides source-specific statistical baselines; other model endpoints "
+        "remain placeholders and may return mock data."
     ),
     version="0.1.0",
     docs_url="/docs",

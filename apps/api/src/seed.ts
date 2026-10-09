@@ -3,8 +3,9 @@
  */
 import path from 'path';
 import fs from 'fs';
-import { getDb, initializeDatabase } from './database';
+import { closeDb, getDb, initializeDatabase } from './database';
 import { config } from './config';
+import { DEMO_DATABASE_PATH } from './demoDatabase';
 
 interface State { id: string; name: string; name_hi: string; name_mr: string; name_ta: string; lgd_code: number; lat: number; lng: number; }
 interface District { id: string; state_id: string; name: string; name_hi: string; name_mr: string; name_ta: string; lgd_code: number; lat: number; lng: number; }
@@ -124,25 +125,49 @@ const districtScales: Record<string, number> = {
 };
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Demo seed data cannot be written when NODE_ENV=production.');
+  }
+  if (
+    process.env.LMIS_DEMO_SEED_TARGET !== config.db.sqlitePath ||
+    config.db.sqlitePath !== DEMO_DATABASE_PATH
+  ) {
+    throw new Error('Use the explicit seed:demo command and its designated demo database path.');
+  }
+
   console.log('🌱 Starting LMIS seed...');
   await initializeDatabase();
   const db = await getDb();
+  const marker = await db.get('PRAGMA user_version') as { user_version: number };
+  if (marker.user_version === 1) {
+    console.log(`Demo database is already seeded; no rows changed: ${config.db.sqlitePath}`);
+    await closeDb();
+    return;
+  }
+  if (marker.user_version !== 0) {
+    throw new Error(`Unsupported demo database marker ${marker.user_version}; no rows changed.`);
+  }
+
+  const tables = ['alerts', 'gap_scores', 'forecasts', 'demand_indices', 'training_capacity',
+    'eshram_signals', 'industry_hiring_signals', 'job_posting_signals', 'plfs_benchmarks',
+    'users', 'trades', 'sectors', 'districts', 'states'];
+  const populatedTables: string[] = [];
+  for (const table of tables) {
+    const row = await db.get(`SELECT COUNT(*) as count FROM ${table}`) as { count: number };
+    if (row.count > 0) populatedTables.push(table);
+  }
+  if (populatedTables.length > 0) {
+    throw new Error(
+      `Refusing to seed a non-empty database (${populatedTables.join(', ')}). Choose a new designated demo database; no rows were changed.`,
+    );
+  }
+
   const MONTHS = 36;
   const rng = seededRandom(42);
   let alertIdCounter = 1;
 
-  // Clear existing data
-  const tables = ['alerts', 'gap_scores', 'forecasts', 'demand_indices', 'training_capacity',
-    'eshram_signals', 'industry_hiring_signals', 'job_posting_signals', 'plfs_benchmarks',
-    'users', 'trades', 'sectors', 'districts', 'states'];
-  for (const t of tables) {
-    await db.run(`DELETE FROM ${t}`);
-  }
-
-  // Use a transaction
-  await db.run('BEGIN TRANSACTION');
-
   try {
+    await db.run('BEGIN IMMEDIATE TRANSACTION');
     for (const s of states) await db.run('INSERT INTO states VALUES (?,?,?,?,?,?,?,?)', [s.id, s.name, s.name_hi, s.name_mr, s.name_ta, s.lgd_code, s.lat, s.lng]);
     for (const d of districts) await db.run('INSERT INTO districts VALUES (?,?,?,?,?,?,?,?,?)', [d.id, d.state_id, d.name, d.name_hi, d.name_mr, d.name_ta, d.lgd_code, d.lat, d.lng]);
     for (const s of sectors) await db.run('INSERT INTO sectors VALUES (?,?,?,?,?,?)', [s.id, s.name, s.name_hi, s.name_mr, s.name_ta, s.color]);
@@ -241,6 +266,7 @@ async function seed() {
         }
       }
     }
+    await db.run('PRAGMA user_version = 1');
     await db.run('COMMIT');
   } catch (error) {
     await db.run('ROLLBACK');
@@ -263,6 +289,11 @@ async function seed() {
   console.log(`  Alerts: ${await count('alerts')}`);
   console.log(`  Users: ${await count('users')}`);
   console.log(`\n✅ Seed complete! Database at: ${config.db.sqlitePath}`);
+  await closeDb();
 }
 
-seed().catch(console.error);
+seed().catch(async (error: unknown) => {
+  console.error('Demo seed failed:', error);
+  process.exitCode = 1;
+  await closeDb();
+});

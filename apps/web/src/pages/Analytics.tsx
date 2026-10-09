@@ -1,101 +1,224 @@
-import { useEffect, useState } from 'react';
-import { fetchApi } from '../services/api';
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { CircleMarker, MapContainer, TileLayer, Tooltip } from 'react-leaflet';
+import { MapPin, Search } from 'lucide-react';
+import { apiClient } from '../lib/apiClient';
+import { EmptyState } from '../components/EmptyState';
+import { ErrorState } from '../components/ErrorState';
+
+interface StateRecord {
+  id: string;
+  name: string;
+}
+
+interface DistrictSummary {
+  district_id: string;
+  district_name: string;
+  state_id: string;
+  lat: number | null;
+  lng: number | null;
+  pairs: number;
+  avg_demand: number;
+  avg_supply: number;
+  avg_severity: number;
+  shortage_count: number;
+  oversupply_count: number;
+  active_alerts: number;
+}
+
+interface DistrictIndex {
+  trade_id: string;
+  trade_name: string | null;
+  period: string;
+  demand_index: number | null;
+  computation_status: 'computed' | 'insufficient_data';
+  components: Record<string, { normalized_value: number | null; status: string }>;
+}
 
 export const Analytics = () => {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetchApi('/districts/summary');
-        setData(res.data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const [state, setState] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const statesQuery = useQuery({
+    queryKey: ['geo-states'],
+    queryFn: async () => {
+      const response = await apiClient.get('/geo/states');
+      if (!Array.isArray(response.data)) {
+        throw new Error('The states endpoint returned an unexpected response.');
       }
-    };
-    load();
-  }, []);
+      return response.data as StateRecord[];
+    },
+  });
+  const districtsQuery = useQuery({
+    queryKey: ['district-summary', state],
+    queryFn: async () => {
+      const params = state ? `?state=${encodeURIComponent(state)}` : '';
+      const response = await apiClient.get(`/districts/summary${params}`);
+      if (!Array.isArray(response.data)) {
+        throw new Error('The district-summary endpoint returned an unexpected response.');
+      }
+      return response.data as DistrictSummary[];
+    },
+  });
+  const districts = districtsQuery.data ?? [];
+  const selected = districts.find((district) => district.district_id === selectedId) ?? districts[0] ?? null;
+  const indexQuery = useQuery({
+    queryKey: ['district-demand-index', selected?.district_id],
+    queryFn: async () => {
+      const response = await apiClient.get(`/demand-index?district=${encodeURIComponent(selected!.district_id)}`);
+      if (!Array.isArray(response.data)) {
+        throw new Error('The demand-index endpoint returned an unexpected response.');
+      }
+      return response.data as DistrictIndex[];
+    },
+    enabled: Boolean(selected),
+  });
+  const mappableDistricts = districts.filter(
+    (district) => Number.isFinite(district.lat) && Number.isFinite(district.lng),
+  );
+  const mapCenter: [number, number] | null = mappableDistricts.length
+    ? [
+      mappableDistricts.reduce((sum, district) => sum + district.lat!, 0) / mappableDistricts.length,
+      mappableDistricts.reduce((sum, district) => sum + district.lng!, 0) / mappableDistricts.length,
+    ]
+    : null;
+  const sortedIndex = [...(indexQuery.data ?? [])].sort((a, b) => b.period.localeCompare(a.period));
+  const indexPeriod = sortedIndex[0]?.period;
+  const currentIndex = sortedIndex.filter((record) => record.period === indexPeriod);
+  const computedIndex = currentIndex.filter((record) => record.computation_status === 'computed' && record.demand_index !== null);
+  const retry = () => { void statesQuery.refetch(); void districtsQuery.refetch(); };
 
-  if (loading) return <div className="page-container">Loading analytics...</div>;
-
-  const getMarkerColor = (severity: number, shortage: number, oversupply: number) => {
-    if (shortage > oversupply) return 'var(--status-shortage)';
-    if (oversupply > shortage) return 'var(--status-oversupply)';
-    return 'var(--status-balanced)';
-  };
+  if (statesQuery.isPending || districtsQuery.isPending) {
+    return <div className="page-container"><div className="surface loading-state">Loading district intelligence…</div></div>;
+  }
+  if (statesQuery.isError || districtsQuery.isError) {
+    return <ErrorState message="District intelligence could not be loaded." onRetry={retry} />;
+  }
+  if (!districts.length) return <EmptyState message="No district summaries are available for this selection." />;
 
   return (
-    <div className="page-container animate-fade-in" style={{ height: 'calc(100vh - 72px)', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ marginBottom: '1rem' }}>
-        <h1 className="title-lg text-gradient">Geospatial Gap Analytics</h1>
-        <p className="text-secondary">District-level heatmaps of demand-supply misalignments</p>
-      </header>
-
-      <div className="glass-panel" style={{ flex: 1, position: 'relative', overflow: 'hidden', border: '1px solid var(--border-glow)' }}>
-        <MapContainer 
-          center={[20.5937, 78.9629]} 
-          zoom={5} 
-          style={{ height: '100%', width: '100%', background: 'var(--bg-app)' }}
-          zoomControl={false}
-        >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; OpenStreetMap &copy; CARTO'
-          />
-          {data.map((district: any) => (
-            <CircleMarker
-              key={district.district_id}
-              center={[district.lat, district.lng]}
-              radius={Math.max(8, district.avg_severity / 3)}
-              pathOptions={{
-                color: getMarkerColor(district.avg_severity, district.shortage_count, district.oversupply_count),
-                fillColor: getMarkerColor(district.avg_severity, district.shortage_count, district.oversupply_count),
-                fillOpacity: 0.6,
-                weight: 2
-              }}
-            >
-              <Tooltip className="custom-chart-tooltip" direction="top">
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.25rem' }}>{district.district_name}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span className="text-muted">Shortage Trades:</span>
-                    <span style={{ color: 'var(--status-shortage)' }}>{district.shortage_count}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span className="text-muted">Oversupply Trades:</span>
-                    <span style={{ color: 'var(--status-oversupply)' }}>{district.oversupply_count}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span className="text-muted">Active Alerts:</span>
-                    <span style={{ color: 'var(--status-critical)' }}>{district.active_alerts}</span>
-                  </div>
-                </div>
-              </Tooltip>
-            </CircleMarker>
-          ))}
-        </MapContainer>
-        
-        {/* Legend Overlay */}
-        <div style={{ position: 'absolute', bottom: '2rem', right: '2rem', zIndex: 1000, background: 'rgba(15,17,26,0.85)', backdropFilter: 'blur(10px)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-lg)' }}>
-          <h4 style={{ fontSize: '0.875rem', marginBottom: '0.5rem', fontWeight: 600 }}>Market Condition</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--status-shortage)' }}></div> Demand &gt; Supply
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--status-balanced)' }}></div> Balanced Market
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--status-oversupply)' }}></div> Supply &gt; Demand
-            </div>
-          </div>
+    <div className="page-container animate-fade-in">
+      <section className="page-intro">
+        <div>
+          <p className="eyebrow">GEOGRAPHIC EXPLORATION</p>
+          <h2>Explore districts</h2>
+          <p className="text-secondary">Browse seeded gap summaries and direct-demand index signals.</p>
         </div>
-      </div>
+        <label className="select-wrap">
+          <span className="sr-only">Filter by state</span>
+          <MapPin size={17} />
+          <select value={state} onChange={(event) => { setState(event.target.value); setSelectedId(null); }} aria-label="Filter by state">
+            <option value="">All states</option>
+            {(statesQuery.data ?? []).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+          </select>
+        </label>
+      </section>
+
+      {selected && (
+        <section className="surface selected-district">
+          <div className="selected-heading">
+            <div>
+              <p className="eyebrow">SELECTED DISTRICT</p>
+              <h2>{selected.district_name}</h2>
+              <span className="text-secondary">{selected.state_id} · {selected.pairs} trade pairs in seeded gap data</span>
+            </div>
+            <span className="district-pin"><MapPin size={18} /></span>
+          </div>
+          <div className="district-metrics">
+            <div><strong>{selected.shortage_count}</strong><span>Shortage pairs</span></div>
+            <div><strong>{selected.oversupply_count}</strong><span>Oversupply pairs</span></div>
+            <div><strong>{selected.active_alerts}</strong><span>Active alerts</span></div>
+          </div>
+          <div className="district-index">
+            <div className="district-index-head">
+              <div><span className="eyebrow">LABOUR DEMAND INDEX · LDI-v1</span><small>{indexPeriod ? `Latest available period · ${indexPeriod}` : 'Synthetic demonstration signals'}</small></div>
+              <strong>{indexQuery.isPending ? '…' : computedIndex.length ? (computedIndex.reduce((sum, record) => sum + record.demand_index!, 0) / computedIndex.length).toFixed(1) : 'N/A'}</strong>
+            </div>
+            {indexQuery.isError ? (
+              <button className="text-button" onClick={() => void indexQuery.refetch()}>Index unavailable · Retry</button>
+            ) : indexQuery.isPending ? (
+              <small className="text-secondary">Loading source signal breakdown…</small>
+            ) : computedIndex.length ? (
+              <div className="trade-signal-list">
+                {computedIndex.slice(0, 4).map((record) => (
+                  <div className="trade-signal-row" key={record.trade_id}>
+                    <span>{record.trade_name ?? record.trade_id}</span>
+                    <strong>{record.demand_index?.toFixed(1)}</strong>
+                    <small>
+                      {Object.entries(record.components)
+                        .filter(([, component]) => component.status === 'available')
+                        .map(([source, component]) => `${source.replace('_', ' ')} ${component.normalized_value}`)
+                        .join(' · ')}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            ) : <small className="text-secondary">No valid direct-demand signals are available for this district.</small>}
+            <small className="provenance-note">Job postings and industry hiring only · synthetic demo records, not observed employment statistics.</small>
+          </div>
+        </section>
+      )}
+
+      {mapCenter && mappableDistricts.length > 0 && (
+        <section className="surface map-card">
+          <div className="section-heading">
+            <div><p className="eyebrow">DISTRICT MAP</p><h2>Gap summary</h2></div>
+            <span className="map-count">{mappableDistricts.length} locations</span>
+          </div>
+          <div className="map-frame">
+            <MapContainer key={state || 'all'} center={mapCenter} zoom={state ? 7 : 5} scrollWheelZoom={false}>
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                attribution="&copy; OpenStreetMap &copy; CARTO"
+              />
+              {mappableDistricts.map((district) => {
+                const color = district.shortage_count > district.oversupply_count
+                  ? '#fb7185'
+                  : district.oversupply_count > district.shortage_count
+                    ? '#60a5fa'
+                    : '#34d399';
+                return (
+                  <CircleMarker
+                    key={district.district_id}
+                    center={[district.lat!, district.lng!]}
+                    radius={selected?.district_id === district.district_id ? 11 : 8}
+                    pathOptions={{ color, fillColor: color, fillOpacity: 0.72, weight: selected?.district_id === district.district_id ? 3 : 1 }}
+                    eventHandlers={{ click: () => setSelectedId(district.district_id) }}
+                  >
+                    <Tooltip direction="top">
+                      <strong>{district.district_name}</strong><br />
+                      Shortage pairs: {district.shortage_count}<br />
+                      Oversupply pairs: {district.oversupply_count}<br />
+                      Active alerts: {district.active_alerts}
+                    </Tooltip>
+                  </CircleMarker>
+                );
+              })}
+            </MapContainer>
+          </div>
+          <div className="map-legend">
+            <span><i className="legend-dot legend-shortage" /> More shortage pairs</span>
+            <span><i className="legend-dot legend-balanced" /> Balanced counts</span>
+            <span><i className="legend-dot legend-oversupply" /> More oversupply pairs</span>
+          </div>
+        </section>
+      )}
+
+      <section className="district-directory">
+        <div className="section-heading"><div><p className="eyebrow">DISTRICT DIRECTORY</p><h2>Available summaries</h2></div><span className="map-count">{districts.length} districts</span></div>
+        <div className="district-list">
+          {districts.map((district) => (
+            <button
+              className={`surface district-list-item${selected?.district_id === district.district_id ? ' selected' : ''}`}
+              onClick={() => setSelectedId(district.district_id)}
+              key={district.district_id}
+            >
+              <span><strong>{district.district_name}</strong><small>{district.state_id} · {district.pairs} trade pairs</small></span>
+              <span className="district-counts"><b className="text-shortage">{district.shortage_count}</b><b className="text-oversupply">{district.oversupply_count}</b></span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <p className="data-disclosure"><Search size={14} /> Map locations and market summaries are seeded demonstration data. Demand index scores use the documented relative LDI-v1 methodology.</p>
     </div>
   );
 };

@@ -1,172 +1,198 @@
 import { useQuery } from '@tanstack/react-query';
+import { Activity, AlertTriangle, ArrowUpRight, BriefcaseBusiness, ShieldAlert } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Link } from 'react-router-dom';
 import { apiClient } from '../lib/apiClient';
-import { Activity, Users, AlertCircle, Briefcase, ChevronRight } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { ErrorState } from '../components/ErrorState';
 import { EmptyState } from '../components/EmptyState';
+import { ErrorState } from '../components/ErrorState';
+
+interface SignalRow {
+  month: string;
+  avg_postings: number | null;
+  avg_hires: number | null;
+}
+
+interface LdiRow {
+  district_id: string;
+  trade_id: string;
+  period: string;
+  demand_index: number | null;
+  computation_status: 'computed' | 'insufficient_data';
+}
 
 export const Dashboard = () => {
-  const { data: overview, isLoading: isOverviewLoading, isError: isOverviewError, refetch: refetchOverview } = useQuery({
+  const overviewQuery = useQuery({
     queryKey: ['overview'],
     queryFn: () => apiClient.get('/overview'),
   });
-
-  const { data: demandData, isLoading: isDemandLoading, isError: isDemandError, refetch: refetchDemand } = useQuery({
-    queryKey: ['demand-supply'],
+  const signalsQuery = useQuery({
+    queryKey: ['overview-signals'],
     queryFn: async () => {
-      const res = await apiClient.get('/demand-supply');
-      const data = Array.isArray(res.data) ? res.data : [];
-      // Aggregate monthly data
-      const aggregated = data.reduce((acc: any, curr: any) => {
-        const month = curr.month;
-        if (!acc[month]) {
-          acc[month] = { month, demand: 0, supply: 0 };
-        }
-        acc[month].demand += (curr.avg_postings || 0) + (curr.avg_hires || 0);
-        acc[month].supply += (curr.avg_workers || 0);
-        return acc;
-      }, {});
-      return Object.values(aggregated).slice(-12) as any[];
+      const response = await apiClient.get('/demand-supply');
+      const rows: SignalRow[] = Array.isArray(response.data) ? response.data : [];
+      const months = new Map<string, { month: string; postings: number; hiring: number }>();
+      for (const row of rows) {
+        const aggregate = months.get(row.month) ?? { month: row.month, postings: 0, hiring: 0 };
+        aggregate.postings += row.avg_postings ?? 0;
+        aggregate.hiring += row.avg_hires ?? 0;
+        months.set(row.month, aggregate);
+      }
+      return Array.from(months.values()).sort((a, b) => a.month.localeCompare(b.month)).slice(-12);
     },
   });
+  const latestPeriod = signalsQuery.data?.at(-1)?.month;
+  const ldiQuery = useQuery({
+    queryKey: ['overview-ldi', latestPeriod],
+    queryFn: async () => {
+      const response = await apiClient.get(`/demand-index?period=${encodeURIComponent(latestPeriod!)}`);
+      if (!Array.isArray(response.data)) {
+        throw new Error('The demand-index endpoint returned an unexpected response.');
+      }
+      return response.data as LdiRow[];
+    },
+    enabled: Boolean(latestPeriod),
+  });
 
-  if (isOverviewLoading || isDemandLoading) {
-    return (
-      <div className="page-container animate-fade-in">
-        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>Loading intelligence...</div>
-      </div>
-    );
+  const overview = overviewQuery.data?.data;
+  const retry = () => {
+    void overviewQuery.refetch();
+    void signalsQuery.refetch();
+  };
+  if (overviewQuery.isPending || signalsQuery.isPending) {
+    return <div className="page-container"><div className="surface loading-state">Loading overview…</div></div>;
   }
-
-  if (isOverviewError || isDemandError) {
-    return <ErrorState message="Failed to load dashboard data." onRetry={() => { refetchOverview(); refetchDemand(); }} />;
+  if (overviewQuery.isError || signalsQuery.isError) {
+    return <ErrorState message="The overview could not be loaded." onRetry={retry} />;
   }
+  if (!overview?.summary) return <EmptyState message="No overview data is available for this scope." />;
 
-  const data = overview?.data;
-
-  if (!data || !data.summary) {
-    return <EmptyState message="No dashboard overview data available." />;
-  }
+  const ldiRecords = ldiQuery.data?.filter((row) => row.computation_status === 'computed' && row.demand_index !== null) ?? [];
+  const averageLdi = ldiRecords.length
+    ? ldiRecords.reduce((total, row) => total + row.demand_index!, 0) / ldiRecords.length
+    : null;
+  const shortages = Array.isArray(overview.topShortages) ? overview.topShortages.slice(0, 3) : [];
 
   return (
     <div className="page-container animate-fade-in">
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <section className="welcome-row">
         <div>
-          <h1 className="title-xl text-gradient" style={{ marginBottom: '0.5rem' }}>National Overview</h1>
-          <p className="text-secondary">Labour Market Intelligence System real-time insights</p>
+          <p className="eyebrow">NATIONAL OVERVIEW</p>
+          <h2 className="welcome-title">Labour market, at a glance</h2>
+          <p className="text-secondary">Explore synthetic labour signals and their source context.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <select className="glass-panel" style={{ padding: '0.5rem 1rem', color: 'white', background: 'var(--bg-card)', border: '1px solid var(--border-color)', outline: 'none' }}>
-            <option>All Sectors</option>
-            <option>Healthcare</option>
-            <option>IT-ITeS</option>
-            <option>Electronics</option>
-            <option>Construction</option>
-          </select>
-          <button className="btn btn-primary">Run Forecast</button>
-        </div>
-      </header>
+        <span className="period-chip">{latestPeriod ? `Source period · ${latestPeriod}` : 'Period unavailable'}</span>
+      </section>
 
-      {/* KPI Cards */}
-      <div className="grid-cards">
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span className="text-secondary font-medium">Critical Shortages</span>
-            <div style={{ padding: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: 'var(--radius-md)', color: 'var(--status-shortage)' }}><Activity size={20} /></div>
+      <Link to="/analytics" className="surface ldi-card">
+        <div className="ldi-card-top">
+          <div>
+            <span className="eyebrow">LABOUR DEMAND INDEX</span>
+            <span className="version-chip">LDI-v1 · PROVISIONAL</span>
           </div>
-          <div className="title-xl">{data.summary.shortage_count || 0} <span className="text-sm text-muted">trades</span></div>
-          <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--status-shortage)' }}>
-            <span style={{ fontWeight: 600 }}>+12%</span> <span className="text-muted">vs last quarter</span>
-          </div>
+          <span className="round-action"><ArrowUpRight size={18} /></span>
         </div>
-
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span className="text-secondary font-medium">Active Alerts</span>
-            <div style={{ padding: '0.5rem', background: 'rgba(249, 115, 22, 0.1)', borderRadius: 'var(--radius-md)', color: 'var(--status-critical)' }}><AlertCircle size={20} /></div>
-          </div>
-          <div className="title-xl">{data.alerts?.active || 0} <span className="text-sm text-muted">anomalies</span></div>
-          <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-            <span className="text-muted">Requires immediate attention</span>
-          </div>
+        <div className="ldi-main">
+          <span className="ldi-score">{ldiQuery.isPending && latestPeriod ? '—' : averageLdi === null ? 'N/A' : averageLdi.toFixed(1)}</span>
+          <span className="ldi-scale">/ 100</span>
         </div>
+        <p className="ldi-caption">
+          {ldiQuery.isError
+            ? 'Index signals are temporarily unavailable. Open Explore to retry.'
+            : ldiQuery.isPending && latestPeriod
+              ? 'Calculating from available direct demand signals…'
+              : !latestPeriod
+                ? 'No demand signal periods are available to calculate an index.'
+              : averageLdi === null
+                ? 'No valid direct demand observations for this period.'
+                : `Mean of ${ldiRecords.length} district–trade scores for ${latestPeriod}.`}
+        </p>
+        <div className="ldi-footer"><span>Job postings + industry hiring · synthetic inputs</span><span>Inspect signals <ArrowUpRight size={14} /></span></div>
+      </Link>
 
-        <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span className="text-secondary font-medium">Oversupplied Markets</span>
-            <div style={{ padding: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-md)', color: 'var(--status-oversupply)' }}><Users size={20} /></div>
-          </div>
-          <div className="title-xl">{data.summary.oversupply_count || 0} <span className="text-sm text-muted">districts</span></div>
-          <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--status-balanced)' }}>
-            <span style={{ fontWeight: 600 }}>-5%</span> <span className="text-muted">vs last quarter</span>
-          </div>
+      <section className="summary-grid" aria-label="Summary">
+        <div className="surface summary-card">
+          <span className="summary-icon icon-shortage"><BriefcaseBusiness size={18} /></span>
+          <div className="summary-number">{overview.summary.shortage_count ?? '—'}</div>
+          <div className="summary-label">Shortage trade–district pairs</div>
+          <Link className="summary-link" to="/analytics">Explore districts <ArrowUpRight size={14} /></Link>
         </div>
-      </div>
+        <div className="surface summary-card">
+          <span className="summary-icon icon-alert"><ShieldAlert size={18} /></span>
+          <div className="summary-number">{overview.alerts?.active ?? '—'}</div>
+          <div className="summary-label">Active demonstration alerts</div>
+          <Link className="summary-link" to="/alerts">Review alerts <ArrowUpRight size={14} /></Link>
+        </div>
+      </section>
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
-        {/* Chart */}
-        <div className="glass-panel" style={{ padding: '1.5rem', gridColumn: 'span 1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3 className="title-md">Demand vs Supply Trend</h3>
-            <button className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>View Detail</button>
+      <section className="surface section-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">DIRECT DEMAND SIGNALS</p>
+            <h2>Postings &amp; industry hiring</h2>
           </div>
-          <div style={{ height: '300px' }}>
-            {demandData && demandData.length > 0 ? (
+          <Link to="/forecasts" className="quiet-link">Forecast <ArrowUpRight size={15} /></Link>
+        </div>
+        {signalsQuery.data?.length ? (
+          <>
+            <div className="chart-wrap">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={demandData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <AreaChart data={signalsQuery.data} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorDemand" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
+                    <linearGradient id="postingsFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#9a85ff" stopOpacity={0.26} />
+                      <stop offset="100%" stopColor="#9a85ff" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="colorSupply" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--accent-tertiary)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="var(--accent-tertiary)" stopOpacity={0}/>
+                    <linearGradient id="hiringFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#31cbb0" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="#31cbb0" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="var(--text-muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val/1000}k`} />
-                  <Tooltip contentStyle={{ background: 'rgba(15,17,26,0.9)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-                  <Area type="monotone" dataKey="demand" stroke="var(--accent-primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorDemand)" name="Demand Signals" />
-                  <Area type="monotone" dataKey="supply" stroke="var(--accent-tertiary)" strokeWidth={3} fillOpacity={1} fill="url(#colorSupply)" name="Workforce Supply" />
+                  <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="rgba(255,255,255,.07)" />
+                  <XAxis dataKey="month" tick={{ fill: '#8f98b0', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={22} />
+                  <YAxis tick={{ fill: '#8f98b0', fontSize: 10 }} tickLine={false} axisLine={false} width={42} />
+                  <Tooltip contentStyle={{ background: '#171a27', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12 }} />
+                  <Area type="monotone" dataKey="postings" name="Job postings" stroke="#9a85ff" strokeWidth={2} fill="url(#postingsFill)" />
+                  <Area type="monotone" dataKey="hiring" name="Industry hires" stroke="#31cbb0" strokeWidth={2} fill="url(#hiringFill)" />
                 </AreaChart>
               </ResponsiveContainer>
-            ) : (
-              <EmptyState message="No trend data available." />
-            )}
-          </div>
-        </div>
+            </div>
+            <div className="chart-legend">
+              <span><i className="legend-dot legend-postings" /> Job postings</span>
+              <span><i className="legend-dot legend-hiring" /> Industry hiring</span>
+              <small>Aggregated counts · synthetic demo data</small>
+            </div>
+          </>
+        ) : <div className="chart-empty">No demand signal records are available for a trend chart.</div>}
+      </section>
 
-        {/* Top Shortages List */}
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 className="title-md">Critical Shortages</h3>
-            <span className="badge badge-shortage">High Priority</span>
+      <section className="surface section-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">PRIORITY SIGNALS</p>
+            <h2>Highest-severity shortages</h2>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-            {Array.isArray(data.topShortages) && data.topShortages.map((item: any, idx: number) => (
-              <div key={idx} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'var(--transition)' }} className="hover:bg-card-hover cursor-pointer">
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--status-shortage)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Briefcase size={20} />
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.trade_name}</div>
-                    <div className="text-muted text-xs">{item.district_name}, {item.state_id}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--status-shortage)' }}>Gap: {item.demand_total - item.supply_total}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--accent-primary)', fontSize: '0.75rem', marginTop: '0.25rem', cursor: 'pointer' }}>
-                    Intervene <ChevronRight size={14} />
-                  </div>
-                </div>
-              </div>
+          <Link to="/analytics" className="quiet-link">Explore <ArrowUpRight size={15} /></Link>
+        </div>
+        {shortages.length ? (
+          <div className="priority-list">
+            {shortages.map((item: Record<string, string | number>, index: number) => (
+              <Link className="priority-item" to="/analytics" key={`${item.district_id}-${item.trade_id}-${index}`}>
+                <span className="priority-index">{String(index + 1).padStart(2, '0')}</span>
+                <span className="priority-copy">
+                  <strong>{item.trade_name}</strong>
+                  <small>{item.district_name}, {item.state_id}</small>
+                </span>
+                <span className="priority-gap">Gap {Number(item.demand_total) - Number(item.supply_total)}<small>seeded estimate</small></span>
+                <ArrowUpRight size={16} className="muted-icon" />
+              </Link>
             ))}
           </div>
-        </div>
-      </div>
+        ) : (
+          <div className="inline-empty"><AlertTriangle size={18} /> No shortage records were returned for this scope.</div>
+        )}
+      </section>
+
+      <p className="data-disclosure"><Activity size={14} /> All figures shown here derive from synthetic demonstration records; they are not live labour-market statistics.</p>
     </div>
   );
 };

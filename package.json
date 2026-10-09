@@ -5,9 +5,11 @@
   "private": true,
   "scripts": {
     "dev:api": "npm run dev --prefix apps/api",
+    "dev:api:demo": "npm run dev:demo --prefix apps/api",
     "dev:web": "npm run dev --prefix apps/web",
     "dev": "npm run dev:api & npm run dev:web",
-    "seed": "npm run seed --prefix apps/api",
+    "seed": "npm run seed:demo --prefix apps/api -- --database ./data/demo/kaushalpulse-demo.db",
+    "seed:demo": "npm run seed",
     "install:all": "npm install && npm install --prefix apps/api && npm install --prefix apps/web"
   }
 }

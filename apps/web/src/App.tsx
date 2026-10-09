@@ -1,52 +1,78 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { ErrorState } from './components/ErrorState';
 import { apiClient } from './lib/apiClient';
 
-// Lazy loaded pages for performance
-const Dashboard = React.lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })));
-const Analytics = React.lazy(() => import('./pages/Analytics').then(module => ({ default: module.Analytics })));
+const Dashboard = React.lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
+const Analytics = React.lazy(() => import('./pages/Analytics').then((module) => ({ default: module.Analytics })));
+const Forecasts = React.lazy(() => import('./pages/Forecasts').then((module) => ({ default: module.Forecasts })));
+const Alerts = React.lazy(() => import('./pages/Alerts').then((module) => ({ default: module.Alerts })));
+const More = React.lazy(() => import('./pages/More').then((module) => ({ default: module.More })));
+const StatusPage = React.lazy(() => import('./pages/More').then((module) => ({ default: module.StatusPage })));
 
-const FallbackComponent = ({ error, resetErrorBoundary }: any) => (
-  <ErrorState message={error.message || 'A rendering error occurred.'} onRetry={resetErrorBoundary} />
+const pageTitles: Record<string, string> = {
+  '/': 'Overview',
+  '/analytics': 'Explore',
+  '/forecasts': 'Forecasts',
+  '/alerts': 'Alerts',
+  '/more': 'More',
+  '/targets': 'Target setting',
+  '/simulate': 'What-if simulation',
+  '/settings': 'Settings',
+};
+
+const FallbackComponent = ({ error, resetErrorBoundary }: { error: unknown; resetErrorBoundary: () => void }) => (
+  <ErrorState message={error instanceof Error ? error.message : 'A rendering error occurred.'} onRetry={resetErrorBoundary} />
 );
 
-function App() {
-  const [apiStatus, setApiStatus] = useState<'healthy' | 'degraded' | 'down'>('healthy');
+function AppShell() {
+  const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'unavailable'>('checking');
+  const { pathname } = useLocation();
+  const title = pageTitles[pathname] ?? 'KaushalPulse';
 
   useEffect(() => {
+    let active = true;
     apiClient.get('/health')
-      .then((res: any) => {
-        if (res.aiService === 'down') setApiStatus('degraded');
-        else setApiStatus('healthy');
-      })
-      .catch(() => setApiStatus('down'));
+      .then(() => { if (active) setApiStatus('connected'); })
+      .catch(() => { if (active) setApiStatus('unavailable'); });
+    return () => { active = false; };
   }, []);
 
   return (
-    <BrowserRouter>
-      <div className="app-layout">
-        <Sidebar />
+    <div className="app-layout">
+      <div className="app-canvas">
+        <Topbar title={title} apiStatus={apiStatus} />
         <main className="main-content">
-          <Topbar apiStatus={apiStatus} />
           <ErrorBoundary FallbackComponent={FallbackComponent}>
-            <Suspense fallback={<div className="page-container"><div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>Loading application module...</div></div>}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/forecasts" element={<div className="page-container title-lg animate-fade-in">Demand Forecasts <span className="text-muted text-sm d-block mt-2">Time-series forecasting coming soon</span></div>} />
-                <Route path="/alerts" element={<div className="page-container title-lg animate-fade-in">Alerts & Anomalies</div>} />
-                <Route path="/targets" element={<div className="page-container title-lg animate-fade-in">Target Setting</div>} />
-                <Route path="/simulate" element={<div className="page-container title-lg animate-fade-in">What-If Simulation</div>} />
-                <Route path="/settings" element={<div className="page-container title-lg animate-fade-in">System Settings</div>} />
-              </Routes>
+            <Suspense fallback={<div className="page-container"><div className="surface loading-state">Loading screen…</div></div>}>
+              <div className="page-scroll" key={pathname}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/forecasts" element={<Forecasts />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/more" element={<More />} />
+                  <Route path="/targets" element={<StatusPage title="Target setting" />} />
+                  <Route path="/simulate" element={<StatusPage title="What-if simulation" />} />
+                  <Route path="/settings" element={<StatusPage title="Settings" />} />
+                </Routes>
+              </div>
             </Suspense>
           </ErrorBoundary>
         </main>
+        <Sidebar />
       </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
     </BrowserRouter>
   );
 }
