@@ -4,7 +4,7 @@ The FastAPI service runs from this directory and currently provides the statisti
 
 ## Local environment
 
-From `apps/ai-service`:
+Use Python 3.11 or 3.12 for the pinned runtime dependencies. From `apps/ai-service`:
 
 ```powershell
 python -m venv .venv

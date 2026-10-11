@@ -18,9 +18,9 @@ interface DistrictSummary {
   lat: number | null;
   lng: number | null;
   pairs: number;
-  avg_demand: number;
-  avg_supply: number;
-  avg_severity: number;
+  avg_demand: number | null;
+  avg_supply: number | null;
+  avg_severity: number | null;
   shortage_count: number;
   oversupply_count: number;
   active_alerts: number;
@@ -103,13 +103,15 @@ export const Analytics = () => {
           <h2>Explore districts</h2>
           <p className="text-secondary">Browse seeded gap summaries and direct-demand index signals.</p>
         </div>
-        <label className="select-wrap">
-          <span className="sr-only">Filter by state</span>
-          <MapPin size={17} />
-          <select value={state} onChange={(event) => { setState(event.target.value); setSelectedId(null); }} aria-label="Filter by state">
-            <option value="">All states</option>
-            {(statesQuery.data ?? []).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-          </select>
+        <label className="district-filter">
+          <span>State</span>
+          <span className="select-wrap">
+            <MapPin size={17} />
+            <select value={state} onChange={(event) => { setState(event.target.value); setSelectedId(null); }} aria-label="Filter by state">
+              <option value="">All states</option>
+              {(statesQuery.data ?? []).map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+            </select>
+          </span>
         </label>
       </section>
 
@@ -127,6 +129,9 @@ export const Analytics = () => {
             <div><strong>{selected.shortage_count}</strong><span>Shortage pairs</span></div>
             <div><strong>{selected.oversupply_count}</strong><span>Oversupply pairs</span></div>
             <div><strong>{selected.active_alerts}</strong><span>Active alerts</span></div>
+            <div><strong>{selected.avg_demand ?? 'N/A'}</strong><span>Average demand total</span></div>
+            <div><strong>{selected.avg_supply ?? 'N/A'}</strong><span>Average supply total</span></div>
+            <div><strong>{selected.avg_severity ?? 'N/A'}</strong><span>Mean gap severity</span></div>
           </div>
           <div className="district-index">
             <div className="district-index-head">
@@ -146,7 +151,7 @@ export const Analytics = () => {
                     <small>
                       {Object.entries(record.components)
                         .filter(([, component]) => component.status === 'available')
-                        .map(([source, component]) => `${source.replace('_', ' ')} ${component.normalized_value}`)
+                        .map(([source, component]) => `${source.replace('_', ' ')} ${component.normalized_value ?? 'N/A'}`)
                         .join(' · ')}
                     </small>
                   </div>
@@ -158,66 +163,87 @@ export const Analytics = () => {
         </section>
       )}
 
-      {mapCenter && mappableDistricts.length > 0 && (
-        <section className="surface map-card">
+      <div className="explore-workspace-grid">
+        {mapCenter && mappableDistricts.length > 0 ? (
+          <section className="surface map-card">
+            <div className="section-heading">
+              <div><p className="eyebrow">DISTRICT MAP</p><h2>Gap summary</h2></div>
+              <span className="map-count">{mappableDistricts.length} locations</span>
+            </div>
+            <div className="map-frame">
+              <MapContainer key={state || 'all'} center={mapCenter} zoom={state ? 7 : 5} scrollWheelZoom={false}>
+                <TileLayer
+                  url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                  attribution="&copy; OpenStreetMap &copy; CARTO"
+                />
+                {mappableDistricts.map((district) => {
+                  const color = district.shortage_count > district.oversupply_count
+                    ? '#DC2626'
+                    : district.oversupply_count > district.shortage_count
+                      ? '#2563EB'
+                      : '#059669';
+                  return (
+                    <CircleMarker
+                      key={district.district_id}
+                      center={[district.lat!, district.lng!]}
+                      radius={selected?.district_id === district.district_id ? 11 : 8}
+                      pathOptions={{ color, fillColor: color, fillOpacity: 0.72, weight: selected?.district_id === district.district_id ? 3 : 1 }}
+                      eventHandlers={{ click: () => setSelectedId(district.district_id) }}
+                    >
+                      <Tooltip direction="top">
+                        <strong>{district.district_name}</strong><br />
+                        Shortage pairs: {district.shortage_count}<br />
+                        Oversupply pairs: {district.oversupply_count}<br />
+                        Active alerts: {district.active_alerts}
+                      </Tooltip>
+                    </CircleMarker>
+                  );
+                })}
+              </MapContainer>
+            </div>
+            <div className="map-legend">
+              <span><i className="legend-dot legend-shortage" /> More shortage pairs</span>
+              <span><i className="legend-dot legend-balanced" /> Balanced counts</span>
+              <span><i className="legend-dot legend-oversupply" /> More oversupply pairs</span>
+            </div>
+          </section>
+        ) : (
+          <section className="surface map-card map-unavailable">
+            <div className="section-heading">
+              <div><p className="eyebrow">DISTRICT MAP</p><h2>Gap summary</h2></div>
+            </div>
+            <p className="text-secondary">Map coordinates are not available for these district summaries.</p>
+          </section>
+        )}
+
+        <section className="district-directory">
           <div className="section-heading">
-            <div><p className="eyebrow">DISTRICT MAP</p><h2>Gap summary</h2></div>
-            <span className="map-count">{mappableDistricts.length} locations</span>
+            <div><p className="eyebrow">DISTRICT DIRECTORY</p><h2>Available summaries</h2></div>
+            <span className="map-count">{districts.length} districts</span>
           </div>
-          <div className="map-frame">
-            <MapContainer key={state || 'all'} center={mapCenter} zoom={state ? 7 : 5} scrollWheelZoom={false}>
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                attribution="&copy; OpenStreetMap &copy; CARTO"
-              />
-              {mappableDistricts.map((district) => {
-                const color = district.shortage_count > district.oversupply_count
-                  ? '#DC2626'
-                  : district.oversupply_count > district.shortage_count
-                    ? '#2563EB'
-                    : '#059669';
-                return (
-                  <CircleMarker
-                    key={district.district_id}
-                    center={[district.lat!, district.lng!]}
-                    radius={selected?.district_id === district.district_id ? 11 : 8}
-                    pathOptions={{ color, fillColor: color, fillOpacity: 0.72, weight: selected?.district_id === district.district_id ? 3 : 1 }}
-                    eventHandlers={{ click: () => setSelectedId(district.district_id) }}
-                  >
-                    <Tooltip direction="top">
-                      <strong>{district.district_name}</strong><br />
-                      Shortage pairs: {district.shortage_count}<br />
-                      Oversupply pairs: {district.oversupply_count}<br />
-                      Active alerts: {district.active_alerts}
-                    </Tooltip>
-                  </CircleMarker>
-                );
-              })}
-            </MapContainer>
-          </div>
-          <div className="map-legend">
-            <span><i className="legend-dot legend-shortage" /> More shortage pairs</span>
-            <span><i className="legend-dot legend-balanced" /> Balanced counts</span>
-            <span><i className="legend-dot legend-oversupply" /> More oversupply pairs</span>
+          <div className="district-table">
+            <div className="district-table-header">
+              <span>District</span><span>Pairs</span><span>Shortage</span><span>Oversupply</span>
+            </div>
+            <div className="district-list">
+              {districts.map((district) => (
+                <button
+                  className={`district-list-item${selected?.district_id === district.district_id ? ' selected' : ''}`}
+                  onClick={() => setSelectedId(district.district_id)}
+                  aria-pressed={selected?.district_id === district.district_id}
+                  aria-label={`Select ${district.district_name}: ${district.pairs} trade pairs, ${district.shortage_count} shortage, ${district.oversupply_count} oversupply`}
+                  key={district.district_id}
+                >
+                  <span className="district-name"><strong>{district.district_name}</strong><small>{district.state_id}</small></span>
+                  <span>{district.pairs}</span>
+                  <span className="text-shortage">{district.shortage_count}</span>
+                  <span className="text-oversupply">{district.oversupply_count}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </section>
-      )}
-
-      <section className="district-directory">
-        <div className="section-heading"><div><p className="eyebrow">DISTRICT DIRECTORY</p><h2>Available summaries</h2></div><span className="map-count">{districts.length} districts</span></div>
-        <div className="district-list">
-          {districts.map((district) => (
-            <button
-              className={`surface district-list-item${selected?.district_id === district.district_id ? ' selected' : ''}`}
-              onClick={() => setSelectedId(district.district_id)}
-              key={district.district_id}
-            >
-              <span><strong>{district.district_name}</strong><small>{district.state_id} · {district.pairs} trade pairs</small></span>
-              <span className="district-counts"><b className="text-shortage">{district.shortage_count}</b><b className="text-oversupply">{district.oversupply_count}</b></span>
-            </button>
-          ))}
-        </div>
-      </section>
+      </div>
       <p className="data-disclosure"><Search size={14} /> Map locations and market summaries are seeded demonstration data. Demand index scores use the documented relative LDI-v1 methodology.</p>
     </div>
   );

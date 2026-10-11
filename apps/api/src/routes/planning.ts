@@ -28,11 +28,62 @@ function sendPlanningError(res: Response, error: unknown): void {
   throw error;
 }
 
+/**
+ * @openapi
+ * /planning/options:
+ *   get:
+ *     summary: List supported annual district/trade capacity options
+ *     responses:
+ *       200:
+ *         description: Options derived from existing training-capacity rows.
+ */
 planningRouter.get('/planning/options', async (_req: Request, res: Response) => {
   const db = await getDb();
   res.json({ data: await listCapacityOptions(db) });
 });
 
+/**
+ * @openapi
+ * /planning/targets:
+ *   get:
+ *     summary: List saved capacity targets
+ *     parameters:
+ *       - in: query
+ *         name: district_id
+ *         schema: { type: string }
+ *       - in: query
+ *         name: trade_id
+ *         schema: { type: string }
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer, minimum: 2000, maximum: 2100 }
+ *     responses:
+ *       200:
+ *         description: Saved proposals with their original capacity baseline.
+ *       400:
+ *         description: Invalid filters.
+ *   post:
+ *     summary: Save a proposed annual sanctioned-seat target
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [district_id, trade_id, year, target_seats]
+ *             properties:
+ *               district_id: { type: string }
+ *               trade_id: { type: string }
+ *               year: { type: integer, minimum: 2000, maximum: 2100 }
+ *               target_seats: { type: integer, minimum: 0, maximum: 10000000 }
+ *     responses:
+ *       201:
+ *         description: Saved proposal distinct from training-capacity records.
+ *       400:
+ *         description: Invalid input.
+ *       404:
+ *         description: Unsupported district/trade/year.
+ */
 planningRouter.get('/planning/targets', async (req: Request, res: Response) => {
   const { district_id: districtId, trade_id: tradeId, year: rawYear } = req.query;
   if (
@@ -97,6 +148,34 @@ planningRouter.post('/planning/targets', async (req: Request, res: Response) => 
   }
 });
 
+/**
+ * @openapi
+ * /simulate:
+ *   post:
+ *     summary: Compare a capacity-only annual seat scenario with baseline
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [district_id, trade_id, year, adjustment_type, adjustment_value]
+ *             properties:
+ *               district_id: { type: string }
+ *               trade_id: { type: string }
+ *               year: { type: integer, minimum: 2000, maximum: 2100 }
+ *               adjustment_type: { type: string, enum: [percent, seats] }
+ *               adjustment_value: { type: number }
+ *     responses:
+ *       200:
+ *         description: Baseline and scenario sanctioned-seat counts.
+ *       400:
+ *         description: Invalid input or scenario outside supported bounds.
+ *       404:
+ *         description: Unsupported district/trade/year.
+ *       409:
+ *         description: Capacity value is unavailable.
+ */
 planningRouter.post('/simulate', async (req: Request, res: Response) => {
   const {
     district_id: districtId,
