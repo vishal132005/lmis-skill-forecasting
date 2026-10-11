@@ -18,6 +18,7 @@ import { analysisRouter } from './routes/analysis';
 import { exportRouter } from './routes/exportRoutes';
 import { demandIndexRouter } from './routes/demandIndex';
 import { forecastRouter } from './routes/forecast';
+import { planningRouter } from './routes/planning';
 import { swaggerSpec } from './swagger';
 
 const app = express();
@@ -72,6 +73,7 @@ app.use('/api/v1/alerts', alertsRouter);
 app.use('/api/v1', analysisRouter);
 app.use('/api/v1/demand-index', demandIndexRouter);
 app.use('/api/v1/forecasts', forecastRouter);
+app.use('/api/v1', planningRouter);
 app.use('/api/v1', exportRouter);
 
 // ─── Swagger Docs ────────────────────────────────────────────────

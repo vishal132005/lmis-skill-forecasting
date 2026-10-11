@@ -137,6 +137,16 @@ export async function initializeDatabase(): Promise<void> {
       state_scope TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS planning_targets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      district_id TEXT NOT NULL REFERENCES districts(id),
+      trade_id TEXT NOT NULL REFERENCES trades(id),
+      year INTEGER NOT NULL,
+      target_seats INTEGER NOT NULL CHECK (target_seats >= 0),
+      baseline_sanctioned_seats INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_job_postings_dt ON job_posting_signals(district_id, trade_id, month);
     CREATE INDEX IF NOT EXISTS idx_hiring_dt ON industry_hiring_signals(district_id, trade_id, month);
     CREATE INDEX IF NOT EXISTS idx_demand_idx ON demand_indices(district_id, trade_id, month);
@@ -144,6 +154,7 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_gaps_dt ON gap_scores(district_id, trade_id);
     CREATE INDEX IF NOT EXISTS idx_alerts_dt ON alerts(district_id, trade_id, status);
     CREATE INDEX IF NOT EXISTS idx_training_dt ON training_capacity(district_id, trade_id, year);
+    CREATE INDEX IF NOT EXISTS idx_planning_targets_scope ON planning_targets(district_id, trade_id, year, created_at);
   `);
 
   console.log('✅ Database schema initialized');

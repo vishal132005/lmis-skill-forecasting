@@ -46,7 +46,14 @@ export const Alerts = () => {
       {!alerts.length ? <EmptyState message="No alerts were returned by the API." /> : (
         <div className="alert-list">
           {alerts.map((alert) => (
-            <article className="surface alert-card" key={alert.id}>
+            <article 
+              className="surface alert-card" 
+              key={alert.id}
+              style={{
+                borderLeftWidth: '3px',
+                borderLeftColor: ['CRITICAL', 'SEVERE'].includes(alert.severity) ? 'var(--shortage)' : ['HIGH', 'MEDIUM'].includes(alert.severity) ? 'var(--risk-amber)' : 'transparent'
+              }}
+            >
               <div className="alert-card-head">
                 <span className={`severity-pill severity-${alert.severity.toLowerCase()}`}>{alert.severity}</span>
                 <span className={`alert-status status-${alert.status.toLowerCase()}`}>{alert.status.replace('_', ' ')}</span>

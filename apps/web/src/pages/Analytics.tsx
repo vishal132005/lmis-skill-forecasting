@@ -167,15 +167,15 @@ export const Analytics = () => {
           <div className="map-frame">
             <MapContainer key={state || 'all'} center={mapCenter} zoom={state ? 7 : 5} scrollWheelZoom={false}>
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                 attribution="&copy; OpenStreetMap &copy; CARTO"
               />
               {mappableDistricts.map((district) => {
                 const color = district.shortage_count > district.oversupply_count
-                  ? '#fb7185'
+                  ? '#DC2626'
                   : district.oversupply_count > district.shortage_count
-                    ? '#60a5fa'
-                    : '#34d399';
+                    ? '#2563EB'
+                    : '#059669';
                 return (
                   <CircleMarker
                     key={district.district_id}

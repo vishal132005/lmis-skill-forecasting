@@ -237,38 +237,3 @@ dataRouter.get('/training', async (req: Request, res: Response) => {
 
   res.json({ data, total: data.length });
 });
-
-// ─── Simulate (What-If) ──────────────────────────────────────
-
-dataRouter.post('/simulate', async (req: Request, res: Response) => {
-  const { district_id, trade_id, new_seats } = req.body;
-  const db = await getDb();
-
-  const gap = await db.get('SELECT * FROM gap_scores WHERE district_id = ? AND trade_id = ?', [district_id, trade_id]) as Record<string, number> | undefined;
-
-  if (!gap) {
-    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Gap data not found for this pair' } });
-    return;
-  }
-
-  const currentSupply = gap.supply_total;
-  const currentDemand = gap.demand_total;
-  const newSupply = Math.round(new_seats * 0.7); // Assume 70% completion
-  const newGap = currentDemand - newSupply;
-  const newRatio = currentDemand / Math.max(newSupply, 1);
-  let newCategory: string;
-  let newSeverity: number;
-
-  if (newRatio > 1.3) { newCategory = 'SHORTAGE'; newSeverity = Math.min(100, Math.round((newRatio - 1) * 70)); }
-  else if (newRatio < 0.7) { newCategory = 'OVERSUPPLY'; newSeverity = Math.min(100, Math.round((1 / newRatio - 1) * 70)); }
-  else { newCategory = 'BALANCED'; newSeverity = Math.round(Math.abs(newRatio - 1) * 50); }
-
-  res.json({
-    data: {
-      district_id, trade_id,
-      current: { demand: currentDemand, supply: currentSupply, gap: currentDemand - currentSupply, category: gap.category, severity: gap.severity_score },
-      simulated: { new_seats, effective_supply: newSupply, gap: newGap, category: newCategory, severity: newSeverity },
-      change: { supply_delta: newSupply - currentSupply, gap_delta: newGap - (currentDemand - currentSupply), severity_delta: newSeverity - gap.severity_score },
-    },
-  });
-});

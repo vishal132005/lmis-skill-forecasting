@@ -15,7 +15,7 @@ export const More = () => (
         <Link className="surface more-link" to={path} key={path}>
           <span className="more-icon"><Icon size={19} /></span>
           <span><strong>{title}</strong><small>{description}</small></span>
-          <span className="planned-badge">PLANNED</span>
+          {path === '/settings' && <span className="planned-badge">PLANNED</span>}
           <ArrowRight size={17} className="muted-icon" />
         </Link>
       ))}
@@ -27,7 +27,7 @@ export const More = () => (
       <div className="disclosure-banner"><CircleHelp size={16} /><span>Weights are not empirically validated. Current seed records are synthetic demonstrations; no live source integration is claimed.</span></div>
       <Link to="/analytics" className="quiet-link">Inspect a district index <ArrowRight size={15} /></Link>
     </section>
-    <p className="data-disclosure">KaushalPulse is a labour-market intelligence prototype. Target-setting and scenario-planning workflows remain under development.</p>
+    <p className="data-disclosure">KaushalPulse is a labour-market intelligence prototype. Target proposals and capacity scenarios are planning aids based on synthetic demonstration data, not policy forecasts.</p>
   </div>
 );
 

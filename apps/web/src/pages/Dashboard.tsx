@@ -137,22 +137,12 @@ export const Dashboard = () => {
             <div className="chart-wrap">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={signalsQuery.data} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="postingsFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#9a85ff" stopOpacity={0.26} />
-                      <stop offset="100%" stopColor="#9a85ff" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="hiringFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#31cbb0" stopOpacity={0.2} />
-                      <stop offset="100%" stopColor="#31cbb0" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="rgba(255,255,255,.07)" />
-                  <XAxis dataKey="month" tick={{ fill: '#8f98b0', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={22} />
-                  <YAxis tick={{ fill: '#8f98b0', fontSize: 10 }} tickLine={false} axisLine={false} width={42} />
-                  <Tooltip contentStyle={{ background: '#171a27', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12 }} />
-                  <Area type="monotone" dataKey="postings" name="Job postings" stroke="#9a85ff" strokeWidth={2} fill="url(#postingsFill)" />
-                  <Area type="monotone" dataKey="hiring" name="Industry hires" stroke="#31cbb0" strokeWidth={2} fill="url(#hiringFill)" />
+                  <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="month" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={22} />
+                  <YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} tickLine={false} axisLine={false} width={42} />
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)' }} itemStyle={{ color: 'var(--text-primary)' }} />
+                  <Area type="monotone" dataKey="postings" name="Job postings" stroke="var(--accent)" strokeWidth={2} fill="var(--accent)" fillOpacity={0.1} />
+                  <Area type="monotone" dataKey="hiring" name="Industry hires" stroke="var(--oversupply)" strokeWidth={2} fill="var(--oversupply)" fillOpacity={0.1} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

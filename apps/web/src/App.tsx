@@ -12,6 +12,8 @@ const Forecasts = React.lazy(() => import('./pages/Forecasts').then((module) => 
 const Alerts = React.lazy(() => import('./pages/Alerts').then((module) => ({ default: module.Alerts })));
 const More = React.lazy(() => import('./pages/More').then((module) => ({ default: module.More })));
 const StatusPage = React.lazy(() => import('./pages/More').then((module) => ({ default: module.StatusPage })));
+const TargetSetting = React.lazy(() => import('./pages/PlanningTools').then((module) => ({ default: module.TargetSetting })));
+const WhatIfSimulation = React.lazy(() => import('./pages/PlanningTools').then((module) => ({ default: module.WhatIfSimulation })));
 
 const pageTitles: Record<string, string> = {
   '/': 'Overview',
@@ -55,8 +57,8 @@ function AppShell() {
                   <Route path="/forecasts" element={<Forecasts />} />
                   <Route path="/alerts" element={<Alerts />} />
                   <Route path="/more" element={<More />} />
-                  <Route path="/targets" element={<StatusPage title="Target setting" />} />
-                  <Route path="/simulate" element={<StatusPage title="What-if simulation" />} />
+                  <Route path="/targets" element={<TargetSetting />} />
+                  <Route path="/simulate" element={<WhatIfSimulation />} />
                   <Route path="/settings" element={<StatusPage title="Settings" />} />
                 </Routes>
               </div>

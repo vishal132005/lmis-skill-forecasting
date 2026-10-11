@@ -128,13 +128,13 @@ export const Forecasts = () => {
                 <div className="forecast-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 8, right: 6, left: -16, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="rgba(255,255,255,.07)" />
-                      <XAxis dataKey="period" tick={{ fill: '#8f98b0', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={20} />
-                      <YAxis tick={{ fill: '#8f98b0', fontSize: 10 }} tickLine={false} axisLine={false} width={42} />
-                      <Tooltip contentStyle={{ background: '#171a27', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12 }} />
+                      <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--border)" />
+                      <XAxis dataKey="period" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={20} />
+                      <YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} tickLine={false} axisLine={false} width={42} />
+                      <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)' }} itemStyle={{ color: 'var(--text-primary)' }} />
                       <Legend />
-                      <Line type="monotone" dataKey="history" name="Observed history" stroke="#9a85ff" strokeWidth={2} dot={false} connectNulls />
-                      <Line type="monotone" dataKey="forecast" name="Forecast" stroke="#31cbb0" strokeWidth={2.5} strokeDasharray="5 4" dot={{ r: 3 }} connectNulls />
+                      <Line type="monotone" dataKey="history" name="Observed history" stroke="var(--text-primary)" strokeWidth={2} dot={false} connectNulls />
+                      <Line type="monotone" dataKey="forecast" name="Forecast" stroke="var(--accent)" strokeWidth={2.5} strokeDasharray="5 4" dot={{ r: 3 }} connectNulls />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
