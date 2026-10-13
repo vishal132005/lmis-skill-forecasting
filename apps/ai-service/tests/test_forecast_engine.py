@@ -133,6 +133,7 @@ class ForecastEngineTests(unittest.TestCase):
                 )
                 self.assertGreaterEqual(origin["mae"], 0)
                 self.assertGreaterEqual(origin["rmse"], 0)
+                self.assertEqual(len(origin["errors_by_horizon"]), 2)
         self.assertEqual(
             evaluation["selected_method"],
             min(evaluation["candidate_methods"], key=lambda row: row["mae"])["method"],
@@ -176,14 +177,23 @@ class ForecastEngineTests(unittest.TestCase):
         self.assertEqual(zero["status"], "forecasted")
         self.assertEqual(zero["forecast"][0]["value"], 0)
 
-    def test_horizon_must_be_between_one_and_twelve(self):
-        for horizon in (0, 13, True):
+    def test_horizon_must_be_between_one_and_fourteen(self):
+        for horizon in (0, 15, True):
             with self.subTest(horizon=horizon):
                 with self.assertRaises(ValueError):
                     forecast_demand_sources("D1", "T1", horizon, {
                         "job_postings": [],
                         "industry_hiring": [],
                     })
+
+    def test_forecast_supports_up_to_fourteen_months_for_calendar_quarters(self):
+        series = observations(list(range(1, 37)))
+        result = forecast_source("job_postings", series, 14)
+        self.assertEqual(result["status"], "forecasted")
+        self.assertEqual(len(result["forecast"]), 14)
+        for candidate in result["evaluation"]["candidate_methods"]:
+            for origin in candidate["origins"]:
+                self.assertEqual(len(origin["errors_by_horizon"]), 14)
 
 
 if __name__ == "__main__":

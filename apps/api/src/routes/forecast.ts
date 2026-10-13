@@ -20,7 +20,7 @@ export const forecastRouter = Router();
  *             properties:
  *               district_id: { type: string }
  *               trade_id: { type: string }
- *               horizon_months: { type: integer, minimum: 1, maximum: 12 }
+ *               horizon_months: { type: integer, minimum: 1, maximum: 14 }
  *     responses:
  *       200:
  *         description: Source-specific forecasts, evaluation metrics, methodology, and provenance.
@@ -49,7 +49,7 @@ forecastRouter.post('/run', async (req: Request, res: Response) => {
       error: {
         code: 'INVALID_FORECAST_REQUEST',
         message:
-          'district_id and trade_id must be non-empty strings; horizon_months must be an integer from 1 to 12.',
+          'district_id and trade_id must be non-empty strings; horizon_months must be an integer from 1 to 14.',
       },
     });
     return;

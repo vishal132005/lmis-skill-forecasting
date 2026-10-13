@@ -75,6 +75,7 @@ function successfulResponse(horizon: number, hasHistory = true) {
               training_observations: 6,
               mae: 1,
               rmse: 1,
+              errors_by_horizon: Array.from({ length: horizon }, () => 1),
             },
             {
               cutoff_period: '2025-07',
@@ -82,6 +83,7 @@ function successfulResponse(horizon: number, hasHistory = true) {
               training_observations: 7,
               mae: 1,
               rmse: 1,
+              errors_by_horizon: Array.from({ length: horizon }, () => 1),
             },
             {
               cutoff_period: '2025-08',
@@ -89,6 +91,7 @@ function successfulResponse(horizon: number, hasHistory = true) {
               training_observations: 8,
               mae: 1,
               rmse: 1,
+              errors_by_horizon: Array.from({ length: horizon }, () => 1),
             },
           ],
         },
@@ -224,10 +227,10 @@ describe('POST /api/v1/forecasts/run', () => {
     expect(tradeResponse.body.error.code).toBe('TRADE_NOT_FOUND');
   });
 
-  test('rejects a horizon outside 1 through 12', async () => {
+  test('rejects a horizon outside 1 through 14', async () => {
     const response = await sendRequest('/api/v1/forecasts/run', {
       ...requestBody,
-      horizon_months: 13,
+      horizon_months: 15,
     });
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('INVALID_FORECAST_REQUEST');

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { config } from '../config';
 import { Database } from 'sqlite';
 import sqlite3 from 'sqlite3';
+import { MAX_GAP_FORECAST_HORIZON_MONTHS } from '../config/gapConfig';
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const forecastPointSchema = z.object({
@@ -15,6 +16,7 @@ const originSchema = z.object({
   training_observations: z.number().int().positive(),
   mae: z.number().finite().nonnegative(),
   rmse: z.number().finite().nonnegative(),
+  errors_by_horizon: z.array(z.number().finite()).min(1),
 });
 const candidateSchema = z.object({
   method: z.string().min(1),
@@ -35,7 +37,7 @@ const evaluationSchema = z.object({
   evaluation_observations: z.number().int().positive(),
   training_observations_min: z.number().int().positive(),
   training_observations_max: z.number().int().positive(),
-  forecast_horizon_months: z.number().int().min(1).max(12),
+  forecast_horizon_months: z.number().int().min(1).max(MAX_GAP_FORECAST_HORIZON_MONTHS),
   minimum_history: z.number().int().positive(),
   minimum_history_met: z.boolean(),
   candidate_methods: z.array(candidateSchema).min(1),
@@ -55,7 +57,7 @@ const sourceForecastSchema = z.object({
 const aiForecastSchema = z.object({
   district_id: z.string().min(1),
   trade_id: z.string().min(1),
-  horizon_months: z.number().int().min(1).max(12),
+  horizon_months: z.number().int().min(1).max(MAX_GAP_FORECAST_HORIZON_MONTHS),
   methodology_version: z.string().min(1),
   methodology: z.object({
     name: z.string().min(1),
@@ -236,6 +238,7 @@ function validateForecastContract(
             source.history[origin.training_observations - 1]?.period !==
               origin.cutoff_period ||
             origin.target_periods.length !== horizon ||
+            origin.errors_by_horizon.length !== horizon ||
             origin.target_periods[0] !== nextMonth(origin.cutoff_period) ||
             !hasConsecutivePeriods(origin.target_periods) ||
             origin.target_periods.some((period) => !historyPeriods.has(period)),
@@ -342,5 +345,10 @@ export async function runForecast(
 }
 
 export function isSupportedHorizon(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 12;
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= MAX_GAP_FORECAST_HORIZON_MONTHS
+  );
 }

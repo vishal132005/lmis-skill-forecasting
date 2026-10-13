@@ -90,7 +90,7 @@ export async function initializeDatabase(): Promise<void> {
       trade_id TEXT NOT NULL REFERENCES trades(id),
       year INTEGER NOT NULL,
       sanctioned_seats INTEGER, enrolled INTEGER,
-      certified INTEGER, placed INTEGER,
+      certified INTEGER, placed INTEGER, placement_rate REAL,
       centres_count INTEGER
     );
 
@@ -115,6 +115,25 @@ export async function initializeDatabase(): Promise<void> {
       district_id TEXT NOT NULL, trade_id TEXT NOT NULL,
       severity_score REAL, category TEXT,
       demand_total REAL, supply_total REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS gap_results (
+      district_id TEXT NOT NULL REFERENCES districts(id),
+      trade_id TEXT NOT NULL REFERENCES trades(id),
+      period TEXT NOT NULL,
+      forecast_demand REAL,
+      demand_lower REAL,
+      demand_upper REAL,
+      sanctioned_seats REAL,
+      placement_rate REAL,
+      effective_supply REAL,
+      gap REAL,
+      gap_ratio REAL,
+      status TEXT NOT NULL,
+      reason TEXT,
+      computed_at TEXT NOT NULL,
+      method_version TEXT NOT NULL,
+      PRIMARY KEY (district_id, trade_id, period)
     );
 
     CREATE TABLE IF NOT EXISTS alerts (
@@ -154,8 +173,48 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_gaps_dt ON gap_scores(district_id, trade_id);
     CREATE INDEX IF NOT EXISTS idx_alerts_dt ON alerts(district_id, trade_id, status);
     CREATE INDEX IF NOT EXISTS idx_training_dt ON training_capacity(district_id, trade_id, year);
+    CREATE INDEX IF NOT EXISTS idx_gap_results_period_status ON gap_results(period, status);
+    CREATE INDEX IF NOT EXISTS idx_gap_results_district_period ON gap_results(district_id, period);
     CREATE INDEX IF NOT EXISTS idx_planning_targets_scope ON planning_targets(district_id, trade_id, year, created_at);
   `);
+
+  const trainingColumns = await db.all('PRAGMA table_info(training_capacity)') as Array<{ name: string }>;
+  if (!trainingColumns.some((column) => column.name === 'placement_rate')) {
+    await db.exec('ALTER TABLE training_capacity ADD COLUMN placement_rate REAL');
+  }
+
+  // ── Alert engine column migrations (AE-v1) ─────────────────────────────
+  // These columns are added idempotently so existing demo databases upgrade
+  // automatically without requiring a re-seed.
+  const alertColumns = await db.all('PRAGMA table_info(alerts)') as Array<{ name: string }>;
+  const alertColNames = new Set(alertColumns.map((c) => c.name));
+  if (!alertColNames.has('explanation')) {
+    await db.exec('ALTER TABLE alerts ADD COLUMN explanation TEXT');
+  }
+  if (!alertColNames.has('drivers')) {
+    await db.exec('ALTER TABLE alerts ADD COLUMN drivers TEXT');
+  }
+  if (!alertColNames.has('quarters_to_breach')) {
+    await db.exec('ALTER TABLE alerts ADD COLUMN quarters_to_breach INTEGER');
+  }
+  if (!alertColNames.has('breach_period')) {
+    await db.exec('ALTER TABLE alerts ADD COLUMN breach_period TEXT');
+  }
+  if (!alertColNames.has('gap_ratio')) {
+    await db.exec('ALTER TABLE alerts ADD COLUMN gap_ratio REAL');
+  }
+  if (!alertColNames.has('dedupe_key')) {
+    await db.exec('ALTER TABLE alerts ADD COLUMN dedupe_key TEXT');
+    // Unique index ensures ON CONFLICT semantics work for the engine upserts.
+    // We CREATE INDEX rather than UNIQUE constraint because SQLite can't add
+    // a UNIQUE constraint via ALTER TABLE.
+    await db.exec(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_alerts_dedupe ON alerts(dedupe_key) WHERE dedupe_key IS NOT NULL',
+    );
+  }
+  if (!alertColNames.has('updated_at')) {
+    await db.exec('ALTER TABLE alerts ADD COLUMN updated_at TEXT');
+  }
 
   console.log('✅ Database schema initialized');
 }

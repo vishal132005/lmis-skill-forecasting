@@ -224,13 +224,17 @@ async function seed() {
           await db.run('INSERT INTO demand_indices (district_id, trade_id, month, index_value, components) VALUES (?,?,?,?,?)', [district.id, tp.trade_id, month, idx, components]);
         }
 
-        for (let yr = 2023; yr <= 2026; yr++) {
+        const tradeIndex = tradePatterns.findIndex((pattern) => pattern.trade_id === tp.trade_id);
+        const placementRate = Math.round(
+          (0.35 + (tradeIndex / Math.max(1, tradePatterns.length - 1)) * 0.5) * 1000,
+        ) / 1000;
+        for (let yr = 2023; yr <= 2027; yr++) {
           const yrFactor = 1 + tp.supplyGrowth * 12 * (yr - 2023);
           const seats = Math.round(tp.supplyBase * scale * yrFactor * 12);
           const enrolled = Math.round(seats * (0.75 + rng() * 0.2));
           const certified = Math.round(enrolled * (0.6 + rng() * 0.3));
           const placed = Math.round(certified * (0.4 + rng() * 0.35));
-          await db.run('INSERT INTO training_capacity (district_id, trade_id, year, sanctioned_seats, enrolled, certified, placed, centres_count) VALUES (?,?,?,?,?,?,?,?)', [district.id, tp.trade_id, yr, seats, enrolled, certified, placed, Math.max(1, Math.round(seats / (80 + rng() * 40)))]);
+          await db.run('INSERT INTO training_capacity (district_id, trade_id, year, sanctioned_seats, enrolled, certified, placed, placement_rate, centres_count) VALUES (?,?,?,?,?,?,?,?,?)', [district.id, tp.trade_id, yr, seats, enrolled, certified, placed, placementRate, Math.max(1, Math.round(seats / (80 + rng() * 40)))]);
         }
 
         for (let h = 1; h <= 12; h++) {

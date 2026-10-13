@@ -25,7 +25,7 @@ class SourceHistory(PydanticBase):
 class ForecastRequest(PydanticBase):
     district_id: str = Field(..., min_length=1)
     trade_id: str = Field(..., min_length=1)
-    horizon_months: int = Field(default=12, ge=1, le=12)
+    horizon_months: int = Field(default=12, ge=1, le=14)
     sources: SourceHistory
 
 
@@ -45,6 +45,7 @@ class OriginEvaluation(PydanticBase):
     training_observations: int
     mae: float = Field(..., ge=0, allow_inf_nan=False)
     rmse: float = Field(..., ge=0, allow_inf_nan=False)
+    errors_by_horizon: list[float]
 
 
 class CandidateEvaluation(PydanticBase):

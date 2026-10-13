@@ -84,7 +84,7 @@ transformers==4.35.0
 - **Endpoint**: `POST /ai/forecast`
 - **Input**: `{district_id, trade_id, horizon_months, sources: {job_postings: [{period, value}], industry_hiring: [{period, value}]}}`
 - **Output**: source-specific chronological history and forecasts, selected method, rolling-origin MAE/RMSE, evaluation windows, and explicit availability/insufficient-history status.
-- **Methods**: last observation, seasonal naive (requires 24 months), and damped linear trend. Candidate selection uses MAE over common rolling-origin windows; the supported horizon is 1–12 months.
+- **Methods**: last observation, seasonal naive (requires 24 months), and damped linear trend. Candidate selection uses MAE over common rolling-origin windows; the supported horizon is 1–14 months. Each selected-method rolling origin returns signed errors by lead month for empirical prediction-interval calibration.
 - **Missing months**: never filled with zero; a series with gaps is not forecast.
 - **Uncertainty**: prediction intervals are unavailable; no confidence interval is returned.
 - Job postings are summed across the available `source` labels. The current schema has no posting identity for deduplication across portals.

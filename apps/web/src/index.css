@@ -662,6 +662,89 @@ h2 { margin-bottom: 0; font-size: 1.15rem; font-weight: 600; }
 }
 .inline-error button { margin-left: auto; border: 0; color: var(--shortage); background: transparent; cursor: pointer; }
 
+/* ─── Alert engine additions (AE-v1) ────────────────────────────────────── */
+/* Severity pill — SEVERE tier */
+.severity-severe { color: #9D174D; border: 1px solid rgba(157,23,77,0.25); background: rgba(157,23,77,0.07); }
+/* Alert type badge */
+.alert-type-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 0.57rem; font-weight: 700; letter-spacing: 0.06em;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-secondary); background: var(--surface-raised);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+}
+/* Quarters-to-breach chip */
+.qtb-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 0.60rem; font-weight: 600;
+  color: var(--text-secondary); background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+.qtb-chip svg { flex: none; }
+/* Alert explanation paragraph — slightly more prominent than p */
+.alert-explanation {
+  margin: 6px 0 4px;
+  color: var(--text-secondary); font-size: 0.76rem; line-height: 1.55;
+}
+/* Drivers popover wrapper */
+.drivers-wrap { position: relative; display: inline-block; }
+.drivers-trigger {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text-secondary); font-size: 0.62rem;
+  cursor: pointer; user-select: none;
+}
+.drivers-trigger:hover { border-color: var(--accent); color: var(--accent); }
+.drivers-popover {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 100;
+  min-width: 240px; max-width: 320px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(15,23,42,0.12);
+  padding: 12px 14px;
+  animation: fade-scale 0.12s ease;
+}
+@keyframes fade-scale {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.drivers-popover h4 {
+  margin: 0 0 8px; font-size: 0.65rem; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.drivers-table { width: 100%; border-collapse: collapse; }
+.drivers-table td {
+  padding: 3px 0; font-size: 0.70rem; vertical-align: top;
+}
+.drivers-table td:first-child {
+  color: var(--text-secondary); padding-right: 10px; white-space: nowrap;
+}
+.drivers-table td:last-child { color: var(--text-primary); font-weight: 500; text-align: right; }
+/* Alert filter toolbar */
+.alert-filter-bar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-bottom: 14px;
+}
+.alert-filter-bar select {
+  min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text-primary);
+  font-size: 0.70rem;
+}
+/* Auto-resolved status */
+.status-auto_resolved { color: var(--text-muted); border: 1px solid var(--border); background: var(--surface-raised); }
+/* Alert card badge row */
+.alert-badge-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-bottom: 2px;
+}
+
 /* ─── Forecasts ──────────────────────────────────────────────────────────── */
 .forecast-form,
 .source-card,

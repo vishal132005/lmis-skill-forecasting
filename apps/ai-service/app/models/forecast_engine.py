@@ -187,6 +187,10 @@ def rolling_origin_backtest(
                     "rmse": math.sqrt(
                         sum(origin_squared_errors) / len(origin_squared_errors)
                     ),
+                    "errors_by_horizon": [
+                        observed - predicted
+                        for observed, predicted in zip(actual, prediction)
+                    ],
                 }
             )
         if not valid or not errors:
@@ -309,8 +313,8 @@ def forecast_demand_sources(
     horizon: int,
     sources: dict[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
-    if isinstance(horizon, bool) or not isinstance(horizon, int) or not 1 <= horizon <= 12:
-        raise ValueError("horizon_months must be an integer from 1 to 12")
+    if isinstance(horizon, bool) or not isinstance(horizon, int) or not 1 <= horizon <= 14:
+        raise ValueError("horizon_months must be an integer from 1 to 14")
     return {
         "district_id": district_id,
         "trade_id": trade_id,
@@ -337,7 +341,10 @@ def forecast_demand_sources(
                 "Invalid periods or counts are excluded and counted; if any are present, "
                 "no forecast is produced for that source."
             ),
-            "uncertainty": "Prediction intervals are unavailable; no calibrated confidence interval is produced.",
+            "uncertainty": (
+                "This endpoint returns signed rolling-origin errors by lead month, not standalone "
+                "prediction intervals; downstream quarterly gap intervals pair both source errors."
+            ),
         },
         "sources": {
             "job_postings": forecast_source(
@@ -352,6 +359,6 @@ def forecast_demand_sources(
             "Backtests on synthetic demonstration data do not establish real-world forecast accuracy.",
             "Forecasts are source-specific and must not be added as a unique worker/job count.",
             "Job postings are summed across the source column; listings duplicated across portals cannot be deduplicated with the current schema.",
-            "No confidence or prediction interval is available.",
+            "Standalone source forecasts do not include intervals; quarterly gap intervals require enough paired source backtest errors.",
         ],
     }
