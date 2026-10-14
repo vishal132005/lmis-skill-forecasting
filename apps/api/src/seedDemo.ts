@@ -38,7 +38,7 @@ async function main(): Promise<void> {
 
   process.env.SQLITE_PATH = databasePath;
   process.env.LMIS_DEMO_SEED_TARGET = databasePath;
-  await import('./seed');
+  await import('./seed.js');
 }
 
 main().catch((error: unknown) => {

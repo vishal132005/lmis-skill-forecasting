@@ -7,7 +7,7 @@ if (process.env.NODE_ENV === 'production') {
 process.env.SQLITE_PATH = DEMO_DATABASE_PATH;
 if (!process.env.API_PORT) process.env.API_PORT = '4001';
 
-void import('./index').catch((error: unknown) => {
+void import('./index.js').catch((error: unknown) => {
   console.error('Unable to start the demo API:', error);
   process.exitCode = 1;
 });

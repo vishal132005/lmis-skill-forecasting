@@ -14,15 +14,21 @@ const More = React.lazy(() => import('./pages/More').then((module) => ({ default
 const StatusPage = React.lazy(() => import('./pages/More').then((module) => ({ default: module.StatusPage })));
 const TargetSetting = React.lazy(() => import('./pages/PlanningTools').then((module) => ({ default: module.TargetSetting })));
 const WhatIfSimulation = React.lazy(() => import('./pages/PlanningTools').then((module) => ({ default: module.WhatIfSimulation })));
+const GapAnalysis = React.lazy(() => import('./pages/GapAnalysis').then((module) => ({ default: module.GapAnalysis })));
+const Recommendations = React.lazy(() => import('./pages/Recommendations').then((module) => ({ default: module.Recommendations })));
+const DataUpload = React.lazy(() => import('./pages/DataUpload').then((module) => ({ default: module.DataUpload })));
 
 const pageTitles: Record<string, string> = {
   '/': 'Overview',
   '/analytics': 'Explore',
-  '/forecasts': 'Forecasts',
-  '/alerts': 'Alerts',
+  '/gap-analysis': 'Gap Analysis & Heatmap',
+  '/forecasts': 'Demand Forecasts',
+  '/alerts': 'Early-Warning Alerts',
+  '/recommendations': 'AI Training Recommendations',
+  '/upload': 'Data Ingestion & Upload',
   '/more': 'More',
-  '/targets': 'Target setting',
-  '/simulate': 'What-if simulation',
+  '/targets': 'Target Setting',
+  '/simulate': 'What-If Simulation',
   '/settings': 'Settings',
 };
 
@@ -114,8 +120,11 @@ function AppShell() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/analytics" element={<Analytics />} />
+                <Route path="/gap-analysis" element={<GapAnalysis />} />
                 <Route path="/forecasts" element={<Forecasts />} />
                 <Route path="/alerts" element={<Alerts />} />
+                <Route path="/recommendations" element={<Recommendations />} />
+                <Route path="/upload" element={<DataUpload />} />
                 <Route path="/more" element={<More />} />
                 <Route path="/targets" element={<TargetSetting />} />
                 <Route path="/simulate" element={<WhatIfSimulation />} />
