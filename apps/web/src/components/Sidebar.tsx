@@ -5,8 +5,11 @@ import {
   ChartNoAxesCombined,
   Compass,
   House,
+  Map,
   SlidersHorizontal,
+  Sparkles,
   Target,
+  Upload,
   type LucideIcon,
 } from 'lucide-react';
 import type { RefObject } from 'react';
@@ -29,7 +32,9 @@ const groups: { heading: string | null; links: Destination[] }[] = [
     heading: 'Labour Market',
     links: [
       { label: 'Explore', path: '/analytics', icon: Compass },
+      { label: 'Gap Heatmap', path: '/gap-analysis', icon: Map },
       { label: 'Forecasts', path: '/forecasts', icon: ChartNoAxesCombined },
+      { label: 'Data Ingestion', path: '/upload', icon: Upload },
     ],
   },
   {
@@ -37,8 +42,9 @@ const groups: { heading: string | null; links: Destination[] }[] = [
     links: [{ label: 'Alerts', path: '/alerts', icon: Bell }],
   },
   {
-    heading: 'Planning',
+    heading: 'Planning & Policy',
     links: [
+      { label: 'AI Recommendations', path: '/recommendations', icon: Sparkles },
       { label: 'Target Setting', path: '/targets', icon: Target },
       { label: 'What-if Simulation', path: '/simulate', icon: SlidersHorizontal },
     ],
