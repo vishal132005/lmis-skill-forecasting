@@ -147,6 +147,32 @@ export async function generateRecommendations(
     params,
   )) as GapRow[];
 
+  if (gapRows.length === 0) {
+    const scores = (await db.all(
+      `SELECT g.district_id, d.name AS district_name, d.state_id,
+              g.trade_id, t.name AS trade_name, t.sector_id, s.name AS sector_name,
+              '2026-Q4' AS period, g.demand_total AS forecast_demand, g.supply_total AS effective_supply,
+              (g.demand_total - g.supply_total) AS gap,
+              CASE WHEN g.demand_total > 0 THEN ROUND((CAST(g.demand_total - g.supply_total AS REAL) / g.demand_total), 2) ELSE 0 END AS gap_ratio,
+              CASE
+                WHEN g.category = 'SHORTAGE' AND g.severity_score > 50 THEN 'ACUTE_SHORTAGE'
+                WHEN g.category = 'SHORTAGE' THEN 'EMERGING_SHORTAGE'
+                WHEN g.category = 'OVERSUPPLY' THEN 'OVERSUPPLY'
+                ELSE 'BALANCED'
+              END AS status
+       FROM gap_scores g
+       JOIN districts d ON d.id = g.district_id
+       JOIN trades t ON t.id = g.trade_id
+       JOIN sectors s ON s.id = t.sector_id
+       ${whereClause}
+       ORDER BY g.severity_score DESC`,
+      params,
+    )) as GapRow[];
+    for (const row of scores) {
+      gapRows.push(row);
+    }
+  }
+
   // Deduplicate: keep latest period per district-trade
   const latestGaps = new Map<string, GapRow>();
   for (const row of gapRows) {
